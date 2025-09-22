@@ -1,0 +1,34 @@
+service_type:
+  - id: st_flight_keywords
+    lang: "*"
+    pattern: "\\b(pnr|booking\\s*ref|flight|airline|itinerary)\\b"
+    precision: normal
+  - id: st_wallet_keywords
+    lang: "*"
+    pattern: "\\b(wallet|top ?up|withdraw(al)?|balance)\\b"
+    precision: high
+  - id: st_esim_keywords
+    lang: "*"
+    pattern: "\\besim|e-sim\\b"
+    precision: normal
+  - id: st_visa_keywords
+    lang: "*"
+    pattern: "\\bvisa\\b"
+    precision: normal
+category:
+  - id: cat_cancel
+    lang: "*"
+    pattern: "\\b(cancel|refund|chargeback)\\b"
+    precision: normal
+  - id: cat_topup
+    lang: "*"
+    pattern: "\\btop[ -]?up|add funds\\b"
+    precision: high
+  - id: cat_withdraw
+    lang: "*"
+    pattern: "\\bwithdraw(al)?|cash out|payout\\b"
+    precision: high
+  - id: cat_modify
+    lang: "*"
+    pattern: "\\bmodify|change|resched(ule)?\\b"
+    precision: normal
