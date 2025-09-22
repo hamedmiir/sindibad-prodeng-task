@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import json
+from datetime import datetime
 
 from ..config import get_settings
 from ..db import create_all, session_scope
@@ -32,14 +33,16 @@ def main() -> None:
 
                 lang = lang_and_scrub.detect_lang(record["text"])
                 clean_text, redactions = lang_and_scrub.scrub_pii(record["text"])
+                message_ts = datetime.utcnow()
                 message = Message(
                     sender="user",
                     text=clean_text,
                     lang=lang,
                     pii_redactions=redactions,
+                    ts=message_ts,
                 )
                 ticket.messages.append(message)
-                ticket.updated_at = message.ts
+                ticket.updated_at = message_ts
                 db.flush()
 
                 conversation_text = " ".join(
