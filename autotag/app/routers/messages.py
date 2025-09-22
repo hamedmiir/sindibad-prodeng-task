@@ -1,6 +1,7 @@
 """Message ingestion endpoints."""
 from __future__ import annotations
 
+from datetime import datetime
 from typing import Optional
 
 from fastapi import APIRouter, Depends
@@ -54,8 +55,8 @@ def ingest_message(payload: schemas.MessageIn, db: Session = Depends(get_db)) ->
         pii_redactions=redactions,
     )
     ticket.messages.append(message)
-    ticket.updated_at = message.ts
     db.flush()
+    ticket.updated_at = message.ts or datetime.utcnow()
 
     conversation_text = _conversation_text(ticket) or clean_text
     rules = get_rules_engine().apply_rules(conversation_text, lang)
