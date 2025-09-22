@@ -1,19 +1,19 @@
 .PHONY: install dev seed retrain test docker
 
 install:
-pip install -e .[dev]
+	pip install -e .[dev]
 
 dev:
-uvicorn autotag.app.main:app --reload
+	uvicorn autotag.app.main:app --reload
 
 seed:
-python -m autotag.scripts.seed_db
+	python -m autotag.scripts.seed_db
 
 retrain:
-python -m autotag.scripts.train_ml
+	python -m autotag.scripts.train_ml
 
 test:
-pytest -q
+	pytest -q
 
 docker:
-docker build -t autotag:dev .
+	docker build -t autotag:dev .
