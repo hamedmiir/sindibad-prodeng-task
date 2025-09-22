@@ -1,4 +1,4 @@
-# AutoTag Service Skeleton
+# AutoTag Service
 
 A minimal hybrid (rules → ML → LLM stub → clarifier) ticket auto-tagger built with FastAPI, SQLite, and scikit-learn. Follow the steps below to install dependencies, seed the database with example conversations, run the API locally or in Docker, execute the test suite, and try the sample endpoints.
 
