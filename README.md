@@ -2,6 +2,76 @@
 
 A minimal hybrid (rules → ML → LLM stub → clarifier) ticket auto-tagger built with FastAPI, SQLite, and scikit-learn. Follow the steps below to install dependencies, seed the database with example conversations, run the API locally or in Docker, execute the test suite, and try the sample endpoints.
 
+## Project overview
+
+AutoTag Service ingests support conversations and automatically assigns a `service_type`/`category` to the underlying ticket. It layers several techniques to maximize accuracy while remaining explainable:
+
+1. **Rules engine** – deterministic keyword/regex patterns loaded from [`app/data/rules.yaml`](autotag/app/data/rules.yaml) provide high-precision matches and confidence hints.
+2. **ML classifier** – scikit-learn TF–IDF + Logistic Regression models produce probability distributions for both service and category.
+3. **LLM adjudicator (stub)** – a deterministic heuristic mimicking a cheap LLM adjusts tags when confidence is marginal.
+4. **Clarifier bot** – asks the user a targeted question when the system is still uncertain; the response finalizes the ticket tags.
+
+The pipeline persists messages, tickets, and audit history in SQLite via SQLAlchemy models. Confidence thresholds (`τ_high=0.80`, `τ_low=0.55`) are configured in [`app/config.py`](autotag/app/config.py).
+
+### Data model
+
+| Table      | Fields (subset)                                                                 | Notes                                               |
+|------------|---------------------------------------------------------------------------------|-----------------------------------------------------|
+| `Ticket`   | `ticket_id`, `conversation_id`, `service_type`, `category`, `tag_confidence`,<br>`tag_source`, `status`, timestamps | Holds the current classification for a conversation. |
+| `Message`  | `message_id`, `ticket_id`, `sender`, `text`, `lang`, `pii_redactions`, `ts`      | Stores scrubbed conversation messages.              |
+| `TagAudit` | `audit_id`, `ticket_id`, `old_service_type`, `new_service_type`, `confidence`,<br>`source`, `reason`, `ts` | Tracks every change to the ticket tags.             |
+
+### Tagging pipeline
+
+1. **Ingest** – `/messages/ingest` accepts a new message, detects language, and redacts PII.
+2. **Persist** – the message is appended to the ticket (created if needed).
+3. **Evaluate** – combines conversation text, applies the rules engine and ML classifier, and feeds results into the confidence policy.
+4. **Decide** – the policy chooses to auto-apply tags, escalate to the LLM adjudicator, or request clarification.
+5. **Clarify** – if needed, `/clarifier/reply` records a user response and finalizes tags.
+
+### Core service components
+
+- `rules_engine`: loads YAML rules, returns tentative tags, rule hits, and precision hints.
+- `ml_classifier`: manages two classifiers (service & category); trains from [`app/data/sample_messages.jsonl`](autotag/app/data/sample_messages.jsonl) if models are missing.
+- `confidence_policy`: fuses rule and ML scores, enforces valid tag combinations, and decides between automatic tagging, LLM review, or clarification.
+- `llm_adjudicator`: deterministic heuristic that simulates an LLM to revise tags and boost confidence.
+- `clarification_bot`: generates disambiguation questions and applies user answers.
+- `tag_writer`: writes tags to the `Ticket` table and appends `TagAudit` entries.
+
+### REST API surface
+
+| Method & Path | Request model       | Response model  | Purpose |
+|---------------|---------------------|-----------------|---------|
+| `POST /messages/ingest` | `MessageIn`          | `IngestOut`      | Add a message, run tagging pipeline, optionally emit clarifier question. |
+| `GET /tickets` | –                   | `[TicketSummary]` | List tickets sorted by `updated_at`. |
+| `GET /tickets/{ticket_id}` | –        | `TicketOut`      | Fetch a ticket with messages and tag audit history. |
+| `POST /tickets/{ticket_id}/override` | `OverrideIn` | `TicketOut`      | Manually set tags with confidence 1.0 and source `agent`. |
+| `POST /admin/retrain` | –             | metrics dict     | Retrain scikit-learn models and return macro/micro F1 metrics. |
+| `GET /admin/metrics` | –              | metrics dict     | Aggregated tagging statistics and ticket counts. |
+| `POST /clarifier/reply` | `ClarifierReplyIn` | `TicketOut` | Apply a user’s answer to finalize tags after clarification. |
+
+These Pydantic schemas live in [`autotag/app/schemas`](autotag/app/schemas/).
+
+### End-to-end flow at a glance
+
+```mermaid
+flowchart TD
+    A[User message] --> B[/messages/ingest]
+    B --> C[Store Message & Ticket]
+    C --> D[rules_engine]
+    C --> E[ml_classifier]
+    D --> F[confidence_policy]
+    E --> F
+    F -->|auto| G[tag_writer]
+    F -->|llm| H[llm_adjudicator]
+    H --> F
+    F -->|clarify| I[clarification_bot]
+    I --> J[/clarifier/reply]
+    J --> G
+```
+
+The flow ensures every message is persisted before classification, producing an audit trail and deterministic replayability for debugging.
+
 ## Requirements
 
 - Python 3.11 or later and `pip`.
