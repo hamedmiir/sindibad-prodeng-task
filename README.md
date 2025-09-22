@@ -1,54 +1,102 @@
 # AutoTag Service Skeleton
 
-A minimal hybrid (rules → ML → LLM stub → clarifier) ticket auto-tagger built with FastAPI, SQLite, and scikit-learn.
+A minimal hybrid (rules → ML → LLM stub → clarifier) ticket auto-tagger built with FastAPI, SQLite, and scikit-learn. Follow the steps below to install dependencies, seed the database with example conversations, run the API locally or in Docker, execute the test suite, and try the sample endpoints.
 
-## Quick start
+## Requirements
 
-### Local
+- Python 3.11 or later and `pip`.
+- SQLite (ships with Python, no external service required).
+- `make` for the provided convenience targets (optional but recommended).
+- `curl` for hitting the example endpoints.
+- Docker 24+ (optional) if you want to run the service in a container.
 
-```bash
-python3.11 -m venv .venv
-source .venv/bin/activate
-pip install -e .[dev]
-make seed
-make dev
-```
-
-In another terminal run the example cURL requests below.
-
-### Docker
+## Local setup and development server
 
 ```bash
-make docker
-# then run the container, exposing port 8000
+git clone <repository-url>
+cd sindibad-prodeng-task
+python -m venv .venv          # create a local virtual environment
+source .venv/bin/activate     # Windows users can run `.venv\\Scripts\\activate`
+make install                  # equivalent: pip install -e .[dev]
+make seed                     # load sample conversations into SQLite
+make dev                      # start uvicorn on http://127.0.0.1:8000
 ```
+
+The seed script creates `autotag/app/data/autotag.db` and trains lightweight
+models if they do not exist. Leave `make dev` running; it reloads when code
+changes. Visit `http://127.0.0.1:8000/docs` for the interactive Swagger UI.
+
+## Running the automated tests
+
+```bash
+make test          # runs pytest with the project's configuration
+```
+
+The same tests can be triggered manually with `pytest -q` once dependencies are
+installed.
+
+## Trying the API locally
+
+With the server running (`make dev`), seed data loaded, and the virtual
+environment active, open a second terminal and send the sample requests below to
+see the end-to-end tagging flow:
+
+```bash
+curl -X POST localhost:8000/messages/ingest -H "content-type: application/json" \
+  -d '{"conversation_id":"c1","text":"please top up my wallet","sender":"user"}'
+
+curl -X POST localhost:8000/tickets/TK1/override -H "content-type: application/json" \
+  -d '{"service_type":"wallet","category":"withdraw","reason":"agent correction"}'
+
+curl -X GET localhost:8000/tickets
+```
+
+Inspect `GET /tickets` (or the Swagger UI) to confirm tickets and tags produced
+by the hybrid rules + ML pipeline. Metrics and retraining utilities are exposed
+under `/admin/*` routes.
+
+## Docker workflow
+
+```bash
+make docker                                      # build the container image
+# start the API (detach so we can run the seed script once the server is up)
+docker run -d --name autotag -p 8000:8000 autotag:dev
+# seed the database inside the running container
+docker exec autotag python -m autotag.scripts.seed_db
+```
+
+The server now accepts requests on `http://127.0.0.1:8000`. When finished, stop
+and clean up with `docker stop autotag && docker rm autotag`. For persistent
+SQLite storage across runs, mount a volume to `/app/autotag/app/data`.
 
 ## Make targets
 
 - `make install` – install the project in editable mode with dev extras.
 - `make dev` – start the FastAPI app with Uvicorn reloader.
 - `make seed` – populate the SQLite database with sample tickets/messages.
-- `make retrain` – retrain the scikit-learn models on `app/data/sample_messages.jsonl`.
+- `make retrain` – retrain the scikit-learn models on `autotag/app/data/sample_messages.jsonl`.
 - `make test` – run the pytest suite.
-
-## Example requests
-
-```bash
-curl -X POST localhost:8000/messages/ingest -H "content-type: application/json" \
- -d '{"conversation_id":"c1","text":"please top up my wallet","sender":"user"}'
-
-curl -X POST localhost:8000/tickets/TK1/override -H "content-type: application/json" \
- -d '{"service_type":"wallet","category":"withdraw","reason":"agent correction"}'
-
-curl -X GET localhost:8000/tickets
-```
+- `make docker` – build the Docker image tagged `autotag:dev`.
 
 ## Confidence thresholds & rules tuning
 
 Confidence bands are defined in `app/config.py` (`τ_high=0.80`, `τ_low=0.55`).
-High-precision rules (marked `precision: high` in `app/data/rules.yaml`) force confidence to ≥0.9.
-Adjust or add regex patterns in `rules.yaml` to capture new keywords or markets.
+High-precision rules (marked `precision: high` in `app/data/rules.yaml`) force
+confidence to ≥0.9. Adjust or add regex patterns in `rules.yaml` to capture new
+keywords or markets.
 
-Models live in `app/data/models/`. If absent, they are trained on startup using the sample dataset.
+Models live in `app/data/models/`. If absent, they are trained on startup using
+the sample dataset. Explore metrics via `GET /admin/metrics`, and retrain models
+with `POST /admin/retrain`. Ticket listings aggregate conversation history so
+the tagging engine always evaluates the full thread when classifying.
 
-Explore metrics via `GET /admin/metrics`, and retrain models with `POST /admin/retrain`. Ticket listings aggregate conversation history so the tagging engine always evaluates the full thread when classifying.
+## Assumptions
+
+- You have Python 3.11+, `make`, and `curl` available in your shell (WSL is
+  recommended for Windows users).
+- Local developers run the seed script before exercising the API so the SQLite
+  database and baseline ML models exist.
+- Docker users run the seeding command inside the container (or mount a
+  persistent volume) before sending requests.
+- Networking is limited to localhost; no external services are required beyond
+  the packages installed via `pip`.
