@@ -1,0 +1,7 @@
+{"text":"I need to cancel my flight, here is my PNR ABC123","service_type":"flight","category":"cancellation"}
+{"text":"how do I top up my wallet? card not working","service_type":"wallet","category":"top_up"}
+{"text":"can I change the hotel booking date?","service_type":"hotel","category":"modify"}
+{"text":"where can I get the esim qr to activate?","service_type":"esim","category":"pre_purchase"}
+{"text":"withdraw my funds from wallet please","service_type":"wallet","category":"withdraw"}
+{"text":"visa appointment status? do I need insurance","service_type":"visa","category":"pre_purchase"}
+{"text":"recheck my order status for flight yday","service_type":"flight","category":"order_recheck"}
