@@ -55,6 +55,12 @@ def ingest_message(payload: schemas.MessageIn, db: Session = Depends(get_db)) ->
         pii_redactions=redactions,
     )
     ticket.messages.append(message)
+<<<<<<< Updated upstream
+=======
+    # Flush first so message.ts is populated by default factory
+    db.flush()
+    ticket.updated_at = message.ts
+>>>>>>> Stashed changes
     db.flush()
     ticket.updated_at = message.ts or datetime.utcnow()
 

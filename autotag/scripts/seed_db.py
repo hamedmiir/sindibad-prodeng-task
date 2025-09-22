@@ -42,7 +42,13 @@ def main() -> None:
                     ts=message_ts,
                 )
                 ticket.messages.append(message)
+<<<<<<< Updated upstream
                 ticket.updated_at = message_ts
+=======
+                # Flush first so message.ts is populated by default factory
+                db.flush()
+                ticket.updated_at = message.ts
+>>>>>>> Stashed changes
                 db.flush()
 
                 conversation_text = " ".join(
